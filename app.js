@@ -236,7 +236,7 @@ function onResults(results) {
       }
       drawCtx.lineCap  = 'round';
       drawCtx.lineJoin = 'round';
-      drawCtx.beginPath();
+      drawCtx.beginPath(); 
       drawCtx.moveTo(prevX, prevY);
       drawCtx.lineTo(ix, iy);
       drawCtx.stroke();
