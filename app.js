@@ -133,4 +133,117 @@ function onResults(results) {
   const tx = (1 - thumbTip.x) * W;
   const ty = thumbTip.y * H;
 
-  // Draw hand skeleton — invertovan
+  // Draw hand skeleton — invertovan (lm.x direktno, bez mirror)
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20],
+    [5,9],[9,13],[13,17]
+  ];
+
+  overlayCtx.strokeStyle = 'rgba(255,255,255,0.6)';
+  overlayCtx.lineWidth   = 2;
+  connections.forEach(([a, b]) => {
+    const ax = lm[a].x * W, ay = lm[a].y * H;
+    const bx = lm[b].x * W, by = lm[b].y * H;
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(ax, ay);
+    overlayCtx.lineTo(bx, by);
+    overlayCtx.stroke();
+  });
+
+  // Draw landmark dots — invertovani
+  lm.forEach((point, i) => {
+    const px = point.x * W, py = point.y * H;
+    overlayCtx.beginPath();
+    overlayCtx.arc(px, py, i === 8 ? 8 : 4, 0, Math.PI * 2);
+    overlayCtx.fillStyle = i === 8 ? currentColor : 'rgba(255,255,255,0.9)';
+    overlayCtx.fill();
+  });
+
+  // 3 prsta (index+middle+ring, pinky dole) = pinch za debljinu
+  if (indexUp && middleUp && ringUp && !pinkyUp) {
+    const pinchDist = getDist(thumbTip, indexTip, W, H);
+    const newSize   = Math.round(Math.min(40, Math.max(2, (pinchDist - 20) / 180 * 38 + 2)));
+    if (newSize !== brushSize) {
+      brushSize            = newSize;
+      brushRange.value     = brushSize;
+      brushVal.textContent = brushSize;
+    }
+
+    // Feedback linija između palca i kažiprsta
+    overlayCtx.beginPath();
+    overlayCtx.moveTo(ix, iy);
+    overlayCtx.lineTo(tx, ty);
+    overlayCtx.strokeStyle = 'rgba(255,200,0,0.8)';
+    overlayCtx.lineWidth   = 2;
+    overlayCtx.stroke();
+
+    // Kružić na sredini koji pokazuje veličinu
+    const mx = (ix + tx) / 2, my = (iy + ty) / 2;
+    overlayCtx.beginPath();
+    overlayCtx.arc(mx, my, brushSize / 2, 0, Math.PI * 2);
+    overlayCtx.strokeStyle = 'rgba(255,200,0,0.8)';
+    overlayCtx.lineWidth   = 1.5;
+    overlayCtx.stroke();
+
+    prevX = null; prevY = null;
+    return;
+  }
+
+  // 4 prsta (index+middle+ring+pinky) = menjanje boje
+  if (indexUp && middleUp && ringUp && pinkyUp) {
+    if (!colorSwitchTriggered) {
+      const btns = document.querySelectorAll('.colorBtn');
+      let currentIndex = -1;
+      btns.forEach((btn, i) => { if (btn.classList.contains('active')) currentIndex = i; });
+      const nextIndex = (currentIndex + 1) % btns.length;
+      btns.forEach(b => b.classList.remove('active'));
+      btns[nextIndex].classList.add('active');
+      currentColor = btns[nextIndex].dataset.color;
+      isEraser     = btns[nextIndex].dataset.eraser === 'true';
+      colorSwitchTriggered = true;
+      status.textContent   = isEraser ? 'Eraser' : btns[nextIndex].title;
+      setTimeout(() => { status.textContent = ''; }, 1000);
+    }
+    prevX = null; prevY = null;
+    return;
+  } else {
+    colorSwitchTriggered = false;
+  }
+
+  // Cursor circle
+  overlayCtx.beginPath();
+  overlayCtx.arc(ix, iy, isEraser ? 20 : Math.max(brushSize / 2, 6), 0, Math.PI * 2);
+  overlayCtx.strokeStyle = isEraser ? '#888' : currentColor;
+  overlayCtx.lineWidth   = 2;
+  overlayCtx.stroke();
+
+  // 1 prst = crtanje, 2 prsta = pauza
+  if (indexUp && !middleUp && !ringUp && !pinkyUp) {
+    if (prevX !== null) {
+      drawCtx.save();
+      if (isEraser) {
+        drawCtx.globalCompositeOperation = 'destination-out';
+        drawCtx.strokeStyle = 'rgba(0,0,0,1)';
+        drawCtx.lineWidth   = brushSize * 3;
+      } else {
+        drawCtx.globalCompositeOperation = 'source-over';
+        drawCtx.strokeStyle = currentColor;
+        drawCtx.lineWidth   = brushSize;
+      }
+      drawCtx.lineCap  = 'round';
+      drawCtx.lineJoin = 'round';
+      drawCtx.beginPath();
+      drawCtx.moveTo(prevX, prevY);
+      drawCtx.lineTo(ix, iy);
+      drawCtx.stroke();
+      drawCtx.restore();
+    }
+    prevX = ix; prevY = iy;
+  } else {
+    prevX = null; prevY = null;
+  }
+}
